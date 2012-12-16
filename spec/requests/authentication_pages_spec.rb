@@ -9,6 +9,13 @@ describe "Authentication" do
 
     it { should have_selector('h1', text: 'Sign in') }
     it { should have_selector('title', text: 'Sign in') }
+
+    describe "before user has signed in" do
+      it { should have_link('Sign in', href: signin_path) }
+      it { should_not have_link('Profile') }
+      it { should_not have_link('Settings') }
+      it { should_not have_link('Sign out') }
+    end
   end
 
   describe "signin" do
@@ -61,8 +68,22 @@ describe "Authentication" do
         end
 
         describe "after signing in" do
+
           it "should render the desired protected page" do
             page.should have_selector('title', text: 'Edit user')
+          end
+        end
+
+        describe "when signing in again" do
+          before do
+            visit signin_path
+            fill_in "Email", with: user.email
+            fill_in "Password", with: user.password
+            click_button "Sign in"
+          end
+
+          it "should render the default (profile) page" do
+            page.should have_selector('title', text: user.name)
           end
         end
       end
@@ -105,12 +126,26 @@ describe "Authentication" do
     describe "as non-admin user" do
       let(:user) { FactoryGirl.create(:user) }
       let(:non_admin) { FactoryGirl.create(:user) }
-
       before { sign_in non_admin }
 
       describe "submitting a DELETE request to the Users#destroy action" do
         before { delete user_path(user) }
         specify { response.should redirect_to(root_path) }
+      end
+    end
+
+    describe "as admin user" do
+
+      describe "in the Users controller" do
+
+        describe "trying to destroy himself" do
+          let(:admin) { FactoryGirl.create(:admin) }
+          before { sign_in admin }
+          
+          it "should fail" do
+            expect { delete user_path(admin) }.not_to change(User, :count)
+          end
+        end
       end
     end
   end

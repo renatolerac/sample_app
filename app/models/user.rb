@@ -16,6 +16,14 @@ class User < ActiveRecord::Base
   has_secure_password
   has_many :microposts, dependent: :destroy
 
+  has_many :relationships, foreign_key: "follower_id", dependent: :destroy
+  has_many :followed_users, through: :relationships, source: :followed
+
+  has_many :reverse_relationships, foreign_key: "followed_id",
+                                   class_name: "Relationship",
+                                   dependent: :destroy
+  has_many :followers, through: :reverse_relationships, source: :follower
+
   #before_save { |user| user.email = email.downcase }
   before_save { self.email.downcase! }
   before_save :create_remember_token
@@ -32,8 +40,20 @@ class User < ActiveRecord::Base
   validates :password_confirmation, presence: true
 
   def feed
-    # This is preliminary. See "Following users" for the full implementation.
-    Micropost.where("user_id = ?", id)
+    # Micropost.where("user_id = ?", id) -> First version
+    Micropost.from_users_followed_by(self)
+  end
+
+  def following?(other_user)
+    self.relationships.find_by_followed_id(other_user.id)
+  end
+
+  def follow!(other_user)
+    self.relationships.create!(followed_id: other_user.id)
+  end
+
+  def unfollow!(other_user)
+    self.relationships.find_by_followed_id(other_user.id).destroy
   end
 
   private
